@@ -19,6 +19,12 @@ for lib in ("PySide6", "PyQt6", "PySide2", "PyQt5"):
 from wgpu.gui.qt import WgpuWidget
 
 from triangle import main
+import PySide6
+
+class MyWidget(QtWidgets.QWidget):
+    def grab(self, rectangle: PySide6.QtCore.QRect=PySide6.QtCore.QRect(0, 0, -1, -1)):
+        print("grabbing screenshot MyWidget")
+        return super().grab(*args, **kwargs)
 
 
 class ExampleWidget(QtWidgets.QWidget):
@@ -30,18 +36,29 @@ class ExampleWidget(QtWidgets.QWidget):
         splitter = QtWidgets.QSplitter()
 
         self.button = QtWidgets.QPushButton("Hello world", self)
+        self.button_grab = QtWidgets.QPushButton("Grab", self)
         self.canvas1 = WgpuWidget(splitter)
         self.canvas2 = WgpuWidget(splitter)
+        self.my_widget = MyWidget()
 
         splitter.addWidget(self.canvas1)
         splitter.addWidget(self.canvas2)
 
-        layout = QtWidgets.QHBoxLayout()
+        layout = QtWidgets.QVBoxLayout()
         layout.addWidget(self.button, 0)
+        layout.addWidget(self.button_grab, 0)
+        layout.addWidget(self.my_widget)
         layout.addWidget(splitter, 1)
         self.setLayout(layout)
 
+        self.button_grab.clicked.connect(self.grab_screenshot)
+
         self.show()
+
+    def grab_screenshot(self):
+        print("grabbing screenshot")
+        qpix = self.grab()
+        qpix.save("screenshot.png", "PNG")
 
 
 app = QtWidgets.QApplication([])
