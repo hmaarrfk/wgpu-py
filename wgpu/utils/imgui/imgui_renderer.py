@@ -108,6 +108,11 @@ class ImguiRenderer:
 
         self._update_gui_function = None
 
+        # Touch state tracking for better touch event handling
+        self._active_touch_count = 0
+        self._last_touch_position = (0, 0)
+
+
     def set_gui(self, gui_updater: callable):
         """
         Set the gui update function that is called on every render cycle to update the GUI
@@ -180,15 +185,54 @@ class ImguiRenderer:
         self._backend.io.display_size = (event["width"], event["height"])
 
     def _on_mouse_move(self, event):
-        self._backend.io.add_mouse_pos_event(event["x"], event["y"])
+        """
+        Handle pointer movement events (mouse and touch movement).
+
+        Updates mouse position and tracks touch movement for better
+        touch event handling.
+        """
+        x = event.get("x", 0)
+        y = event.get("y", 0)
+
+        # Update mouse position
+        self._backend.io.add_mouse_pos_event(x, y)
+
+        # Update touch position tracking
+        self._last_touch_position = (x, y)
 
         if self._backend.io.want_capture_mouse:
             event["stop_propagation"] = True
 
     def _on_mouse(self, event):
+        """
+        Handle pointer events (mouse and touch translated to pointer events).
+
+        Touch events are translated by the JavaScript layer:
+        - Single touch: button=1 (left mouse button)
+        - Two-finger pan: button=2 (middle mouse button)
+        - Pinch/zoom: handled separately via data channel
+        """
         event_type = event["event_type"]
         down = event_type == "pointer_down"
-        self._backend.io.add_mouse_button_event(event["button"] - 1, down)
+        button = event.get("button", 1)
+
+        # Update touch state tracking
+        if down:
+            if button == 1:  # Single touch or left mouse
+                self._active_touch_count = 1
+                self._last_touch_position = (event.get("x", 0), event.get("y", 0))
+            elif button == 2:  # Two-finger pan or middle mouse
+                self._active_touch_count = 2
+        else:
+            # Pointer up - reduce touch count
+            if button == 1:
+                self._active_touch_count = max(0, self._active_touch_count - 1)
+            elif button == 2:
+                self._active_touch_count = max(0, self._active_touch_count - 2)
+
+        # Convert button to ImGui button index (0-based)
+        imgui_button = button - 1
+        self._backend.io.add_mouse_button_event(imgui_button, down)
 
         if self._backend.io.want_capture_mouse:
             event["stop_propagation"] = True
